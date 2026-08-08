@@ -1,7 +1,7 @@
 From ee94113d59ed7f74a6adffeea871d274df6f105e Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:17:53 +0000
-Subject: [PATCH 1/2] Fix QR generator: embed self-contained QR library
+Subject: [PATCH 1/3] Fix QR generator: embed self-contained QR library
 
 - Bundles the qrcode npm library's source directly into index.html
 - Removes dependency on a broken/missing jsdelivr CDN build for
@@ -224,7 +224,7 @@ index 0000000..7cffb18
 From d6bfa376ddc51ce8c12f32c4b36a0435ee83a71b Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:39:33 +0000
-Subject: [PATCH 2/2] Redesign as mobile-app-style asset tag printer
+Subject: [PATCH 2/3] Redesign as mobile-app-style asset tag printer
 
 - Custom kraft-tag visual identity (punch hole, perforated tear line,
   stamped spec line) instead of generic dashboard styling
@@ -917,6 +917,213 @@ index 7cffb18..d28c4c0 100644
 -</html>
 \ No newline at end of file
 +</html>
+-- 
+2.43.0
+
+
+From 06a92302d3922444f7d8173abe1beb5da2b76afe Mon Sep 17 00:00:00 2001
+From: QR Generator <you@example.com>
+Date: Sat, 8 Aug 2026 07:48:09 +0000
+Subject: [PATCH 3/3] Add dark/light mode
+
+- Auto-detects system preference (prefers-color-scheme) on first load
+- Manual toggle in the app bar, persisted via localStorage
+- Inline early-detection script avoids a flash of the wrong theme
+- Dark palette keeps the tag/stamp identity (deep kraft charcoal +
+  lighter stamp blue and void red for contrast) rather than a
+  generic inverted dark mode
+- The printed QR itself stays black-on-white in both themes, like a
+  real label would
+- Verified: theme toggle flips the DOM attribute, persists to
+  storage, and QR generation/decoding still works correctly
+---
+ index.html | 121 +++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 112 insertions(+), 9 deletions(-)
+
+diff --git a/index.html b/index.html
+index d28c4c0..9d4530e 100644
+--- a/index.html
++++ b/index.html
+@@ -4,7 +4,16 @@
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+ <title>Tag Printer — Version 1 QR Generator</title>
+-<meta name="theme-color" content="#EFE6D0" />
++<meta name="theme-color" id="theme-color-meta" content="#EFE6D0" />
++<script>
++  (function () {
++    try {
++      var saved = localStorage.getItem('tag-printer-theme');
++      var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
++      document.documentElement.setAttribute('data-theme', theme);
++    } catch (e) {}
++  })();
++</script>
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+@@ -21,6 +30,58 @@
+     --void-ink:#8C2E24;
+     --line:#C9BFA0;
+     --line-strong:#B4A986;
++    --card-highlight:rgba(255,255,255,.6);
++    --card-shadow:rgba(33,29,23,.4);
++    --punch-shadow:rgba(33,29,23,.35);
++    --qr-shadow:rgba(33,29,23,.4);
++    --scrim:rgba(255,255,255,.5);
++    color-scheme:light;
++  }
++
++  [data-theme="dark"]{
++    --paper:#1B1812;
++    --backdrop:#121009;
++    --card:#26221A;
++    --ink:#F2ECDC;
++    --ink-soft:#9C927A;
++    --stamp:#7CA1D9;
++    --stamp-ink:#AFC7EA;
++    --void:#E2685A;
++    --void-ink:#FF9C90;
++    --line:#3C3527;
++    --line-strong:#4C4432;
++    --card-highlight:rgba(255,255,255,.04);
++    --card-shadow:rgba(0,0,0,.55);
++    --punch-shadow:rgba(0,0,0,.6);
++    --qr-shadow:rgba(0,0,0,.5);
++    --scrim:rgba(0,0,0,.4);
++    color-scheme:dark;
++  }
++
++  @media (prefers-color-scheme:dark){
++    :root:not([data-theme="light"]){
++      --paper:#1B1812;
++      --backdrop:#121009;
++      --card:#26221A;
++      --ink:#F2ECDC;
++      --ink-soft:#9C927A;
++      --stamp:#7CA1D9;
++      --stamp-ink:#AFC7EA;
++      --void:#E2685A;
++      --void-ink:#FF9C90;
++      --line:#3C3527;
++      --line-strong:#4C4432;
++      --card-highlight:rgba(255,255,255,.04);
++      --card-shadow:rgba(0,0,0,.55);
++      --punch-shadow:rgba(0,0,0,.6);
++      --qr-shadow:rgba(0,0,0,.5);
++      --scrim:rgba(0,0,0,.4);
++      color-scheme:dark;
++    }
++  }
++
++  body, .phone, .card, .tag-card, .action-bar{
++    transition:background-color .2s ease, color .2s ease, border-color .2s ease;
+   }
+ 
+   *{ box-sizing:border-box; }
+@@ -87,6 +148,19 @@
+   .app-bar p{
+     margin:4px 0 0; font-size:13px; color:var(--ink-soft);
+   }
++  .app-bar-top{ display:flex; align-items:flex-start; justify-content:space-between; }
++  .theme-toggle{
++    flex:none; width:36px; height:36px; border-radius:50%; border:1px solid var(--line-strong);
++    background:var(--card); color:var(--ink); cursor:pointer;
++    display:flex; align-items:center; justify-content:center;
++    margin-top:-2px;
++  }
++  .theme-toggle:hover{ border-color:var(--stamp); }
++  .theme-toggle:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
++  .theme-toggle svg{ display:block; }
++  .theme-toggle .icon-moon{ display:none; }
++  [data-theme="dark"] .theme-toggle .icon-sun{ display:none; }
++  [data-theme="dark"] .theme-toggle .icon-moon{ display:block; }
+ 
+   /* ---------- Scroll content ---------- */
+   .phone-content{
+@@ -101,8 +175,8 @@
+     background:var(--card);
+     border-radius:18px;
+     padding:18px;
+-    box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 24px -18px rgba(33,29,23,.4);
+-    border:1px solid rgba(33,29,23,.06);
++    box-shadow:0 1px 0 var(--card-highlight) inset, 0 10px 24px -18px var(--card-shadow);
++    border:1px solid var(--line);
+   }
+   .field-label{
+     font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+@@ -185,20 +259,20 @@
+   /* ---------- Tag / preview card ---------- */
+   .tag-card{
+     background:var(--card); border-radius:18px; padding:20px 18px 18px;
+-    box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 24px -18px rgba(33,29,23,.4);
+-    border:1px solid rgba(33,29,23,.06);
++    box-shadow:0 1px 0 var(--card-highlight) inset, 0 10px 24px -18px var(--card-shadow);
++    border:1px solid var(--line);
+     display:flex; flex-direction:column; align-items:center;
+     text-align:center;
+   }
+   .punch{
+     width:22px; height:22px; border-radius:50%; margin-bottom:14px;
+     background:var(--backdrop);
+-    box-shadow:inset 0 2px 4px rgba(33,29,23,.35), 0 1px 0 rgba(255,255,255,.5);
++    box-shadow:inset 0 2px 4px var(--punch-shadow), 0 1px 0 var(--scrim);
+     border:1px solid var(--line-strong);
+   }
+   .qr-wrap{
+     background:#fff; border-radius:14px; padding:14px;
+-    box-shadow:0 6px 16px -10px rgba(33,29,23,.4);
++    box-shadow:0 6px 16px -10px var(--qr-shadow);
+     display:inline-flex; min-height:180px; min-width:180px;
+     align-items:center; justify-content:center;
+   }
+@@ -262,8 +336,16 @@
+   <div class="notch"></div>
+ 
+   <header class="app-bar">
+-    <div class="eyebrow"><span class="dot"></span>Tag Printer</div>
+-    <h1>Version 1 QR</h1>
++    <div class="app-bar-top">
++      <div>
++        <div class="eyebrow"><span class="dot"></span>Tag Printer</div>
++        <h1>Version 1 QR</h1>
++      </div>
++      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
++        <svg class="icon-sun" width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="3.2" stroke="currentColor" stroke-width="1.4"/><path d="M8.5 1.2v1.8M8.5 14v1.8M2.2 8.5H.5M16.5 8.5h-1.7M3.7 3.7l1.3 1.3M12 12l1.3 1.3M13.3 3.7L12 5M5 12l-1.3 1.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
++        <svg class="icon-moon" width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14.5 10.4A6 6 0 017 2.6a6.2 6.2 0 105.7 8.7c.6 0 1.2-.1 1.8-.3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
++      </button>
++    </div>
+     <p>Strict 21×21 matrix · alphanumeric optimized</p>
+   </header>
+ 
+@@ -348,6 +430,27 @@ Minimum version required to store current data is: `+i+`.
+ `);let s=wn(t,e,o),u=et.getSymbolSize(t),c=new on(u);return fn(c,t),gn(c),dn(c,t),Bt(c,e,0),t>=7&&hn(c,t),pn(c,s),isNaN(r)&&(r=At.getBestMask(c,Bt.bind(null,c,e))),At.applyMask(r,c),Bt(c,e,r),{modules:c,version:t,errorCorrectionLevel:e,maskPattern:r,segments:o}}Ae.create=function(t,e){if(typeof t>"u"||t==="")throw new Error("No input text");let r=Et.M,o,i;return typeof e<"u"&&(r=Et.from(e.errorCorrectionLevel,Et.M),o=tt.from(e.version),i=At.from(e.maskPattern),e.toSJISFunc&&et.setToSJISFunction(e.toSJISFunc)),yn(t,o,r,i)}});var It=g(L=>{function Ie(n){if(typeof n=="number"&&(n=n.toString()),typeof n!="string")throw new Error("Color should be defined as hex string");let t=n.slice().replace("#","").split("");if(t.length<3||t.length===5||t.length>8)throw new Error("Invalid hex color: "+n);(t.length===3||t.length===4)&&(t=Array.prototype.concat.apply([],t.map(function(r){return[r,r]}))),t.length===6&&t.push("F","F");let e=parseInt(t.join(""),16);return{r:e>>24&255,g:e>>16&255,b:e>>8&255,a:e&255,hex:"#"+t.slice(0,6).join("")}}L.getOptions=function(t){t||(t={}),t.color||(t.color={});let e=typeof t.margin>"u"||t.margin===null||t.margin<0?4:t.margin,r=t.width&&t.width>=21?t.width:void 0,o=t.scale||4;return{width:r,scale:r?4:o,margin:e,color:{dark:Ie(t.color.dark||"#000000ff"),light:Ie(t.color.light||"#ffffffff")},type:t.type,rendererOpts:t.rendererOpts||{}}};L.getScale=function(t,e){return e.width&&e.width>=t+e.margin*2?e.width/(t+e.margin*2):e.scale};L.getImageWidth=function(t,e){let r=L.getScale(t,e);return Math.floor((t+e.margin*2)*r)};L.qrToImageData=function(t,e,r){let o=e.modules.size,i=e.modules.data,s=L.getScale(o,r),u=Math.floor((o+r.margin*2)*s),c=r.margin*s,l=[r.color.light,r.color.dark];for(let a=0;a<u;a++)for(let w=0;w<u;w++){let h=(a*u+w)*4,y=r.color.light;if(a>=c&&w>=c&&a<u-c&&w<u-c){let A=Math.floor((a-c)/s),T=Math.floor((w-c)/s);y=l[i[A*o+T]?1:0]}t[h++]=y.r,t[h++]=y.g,t[h++]=y.b,t[h]=y.a}}});var Ne=g(nt=>{var Nt=It();function En(n,t,e){n.clearRect(0,0,t.width,t.height),t.style||(t.style={}),t.height=e,t.width=e,t.style.height=e+"px",t.style.width=e+"px"}function Cn(){try{return document.createElement("canvas")}catch{throw new Error("You need to specify a canvas element")}}nt.render=function(t,e,r){let o=r,i=e;typeof o>"u"&&(!e||!e.getContext)&&(o=e,e=void 0),e||(i=Cn()),o=Nt.getOptions(o);let s=Nt.getImageWidth(t.modules.size,o),u=i.getContext("2d"),c=u.createImageData(s,s);return Nt.qrToImageData(c.data,t,o),En(u,i,s),u.putImageData(c,0,0),i};nt.renderToDataURL=function(t,e,r){let o=r;typeof o>"u"&&(!e||!e.getContext)&&(o=e,e=void 0),o||(o={});let i=nt.render(t,e,o),s=o.type||"image/png",u=o.rendererOpts||{};return i.toDataURL(s,u.quality)}});var Pe=g(Se=>{var Bn=It();function Me(n,t){let e=n.a/255,r=t+'="'+n.hex+'"';return e<1?r+" "+t+'-opacity="'+e.toFixed(2).slice(1)+'"':r}function Mt(n,t,e){let r=n+t;return typeof e<"u"&&(r+=" "+e),r}function An(n,t,e){let r="",o=0,i=!1,s=0;for(let u=0;u<n.length;u++){let c=Math.floor(u%t),l=Math.floor(u/t);!c&&!i&&(i=!0),n[u]?(s++,u>0&&c>0&&n[u-1]||(r+=i?Mt("M",c+e,.5+l+e):Mt("m",o,0),o=0,i=!1),c+1<t&&n[u+1]||(r+=Mt("h",s),s=0)):o++}return r}Se.render=function(t,e,r){let o=Bn.getOptions(e),i=t.modules.size,s=t.modules.data,u=i+o.margin*2,c=o.color.light.a?"<path "+Me(o.color.light,"fill")+' d="M0 0h'+u+"v"+u+'H0z"/>':"",l="<path "+Me(o.color.dark,"stroke")+' d="'+An(s,i,o.margin)+'"/>',a='viewBox="0 0 '+u+" "+u+'"',h='<svg xmlns="http://www.w3.org/2000/svg" '+(o.width?'width="'+o.width+'" height="'+o.width+'" ':"")+a+' shape-rendering="crispEdges">'+c+l+`</svg>
+ `;return typeof r=="function"&&r(null,h),h}});var Nn=g(O=>{var Tn=_t(),St=Te(),be=Ne(),In=Pe();function Pt(n,t,e,r,o){let i=[].slice.call(arguments,1),s=i.length,u=typeof i[s-1]=="function";if(!u&&!Tn())throw new Error("Callback required as last argument");if(u){if(s<2)throw new Error("Too few arguments provided");s===2?(o=e,e=t,t=r=void 0):s===3&&(t.getContext&&typeof o>"u"?(o=r,r=void 0):(o=r,r=e,e=t,t=void 0))}else{if(s<1)throw new Error("Too few arguments provided");return s===1?(e=t,t=r=void 0):s===2&&!t.getContext&&(r=e,e=t,t=void 0),new Promise(function(c,l){try{let a=St.create(e,r);c(n(a,t,r))}catch(a){l(a)}})}try{let c=St.create(e,r);o(null,n(c,t,r))}catch(c){o(c)}}O.create=St.create;O.toCanvas=Pt.bind(null,be.render);O.toDataURL=Pt.bind(null,be.renderToDataURL);O.toString=Pt.bind(null,function(n,t,e){return In.render(n,e)})});return Nn();})();
+ 
++  // ---------- Theme toggle ----------
++  var themeToggle = document.getElementById('theme-toggle');
++  var themeColorMeta = document.getElementById('theme-color-meta');
++  var THEME_COLORS = { light: '#EFE6D0', dark: '#1B1812' };
++
++  function currentTheme() {
++    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
++  }
++  function applyThemeChrome(theme) {
++    themeColorMeta.setAttribute('content', THEME_COLORS[theme]);
++    themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
++  }
++  applyThemeChrome(currentTheme());
++
++  themeToggle.addEventListener('click', function () {
++    var next = currentTheme() === 'dark' ? 'light' : 'dark';
++    document.documentElement.setAttribute('data-theme', next);
++    try { localStorage.setItem('tag-printer-theme', next); } catch (e) {}
++    applyThemeChrome(next);
++  });
++
+   // ---------- Elements ----------
+   var input = document.getElementById('data-input');
+   var clearBtn = document.getElementById('clear-btn');
 -- 
 2.43.0
 
