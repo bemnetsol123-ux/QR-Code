@@ -1,7 +1,7 @@
 From ee94113d59ed7f74a6adffeea871d274df6f105e Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:17:53 +0000
-Subject: [PATCH 1/6] Fix QR generator: embed self-contained QR library
+Subject: [PATCH 1/7] Fix QR generator: embed self-contained QR library
 
 - Bundles the qrcode npm library's source directly into index.html
 - Removes dependency on a broken/missing jsdelivr CDN build for
@@ -224,7 +224,7 @@ index 0000000..7cffb18
 From d6bfa376ddc51ce8c12f32c4b36a0435ee83a71b Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:39:33 +0000
-Subject: [PATCH 2/6] Redesign as mobile-app-style asset tag printer
+Subject: [PATCH 2/7] Redesign as mobile-app-style asset tag printer
 
 - Custom kraft-tag visual identity (punch hole, perforated tear line,
   stamped spec line) instead of generic dashboard styling
@@ -924,7 +924,7 @@ index 7cffb18..d28c4c0 100644
 From 06a92302d3922444f7d8173abe1beb5da2b76afe Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:48:09 +0000
-Subject: [PATCH 3/6] Add dark/light mode
+Subject: [PATCH 3/7] Add dark/light mode
 
 - Auto-detects system preference (prefers-color-scheme) on first load
 - Manual toggle in the app bar, persisted via localStorage
@@ -1131,7 +1131,7 @@ index d28c4c0..9d4530e 100644
 From ec69435eba71df15cc71ed0d6435e2d85edfa66f Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:09:33 +0000
-Subject: [PATCH 4/6] Match reference QR codes exactly (byte mode +
+Subject: [PATCH 4/7] Match reference QR codes exactly (byte mode +
  qrcode-generator engine)
 
 - Decoded and pixel/module-verified 6 reference QR codes provided by
@@ -1331,7 +1331,7 @@ index 9d4530e..6bc38b1 100644
 From fbda72780c655cfad00a1e89e36bb9118c80b899 Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:20:31 +0000
-Subject: [PATCH 5/6] Add border toggle (rounded card frame)
+Subject: [PATCH 5/7] Add border toggle (rounded card frame)
 
 - New Border switch in the settings card, off by default (preserves
   exact match with the 6 reference codes when off -- re-verified,
@@ -1500,7 +1500,7 @@ index 6bc38b1..d699886 100644
 From 977b2891e538c79e1d3db1d25cceb6d5201579dd Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sun, 9 Aug 2026 06:11:51 +0000
-Subject: [PATCH 6/6] Fix responsive breakpoints for real devices
+Subject: [PATCH 6/7] Fix responsive breakpoints for real devices
 
 - The desktop 'phone mockup' chrome (bezel, notch, fixed height,
   drop shadow) was triggering on ANY viewport >=640px wide -- which
@@ -1594,6 +1594,128 @@ index d699886..931f76c 100644
    .app-bar .eyebrow{
      font-size:11px; letter-spacing:.14em; font-weight:600;
      color:var(--stamp); text-transform:uppercase;
+-- 
+2.43.0
+
+
+From 1da7d7940293e85c2b557dbaeecc072b3b2e6f68 Mon Sep 17 00:00:00 2001
+From: QR Generator <you@example.com>
+Date: Sun, 9 Aug 2026 06:18:11 +0000
+Subject: [PATCH 7/7] Fix horizontal scroll and dark-mode input contrast
+
+Horizontal scroll:
+- The QR canvas had no max-width, so longer payloads using Version
+  Auto could render a bitmap wider than the phone container (verified:
+  a 113-char URL produces a 376px bitmap, which overflows a typical
+  335px content area by 41px) -- this pushed the whole page sideways
+- Added max-width:100%/height:auto on the canvas, max-width on its
+  wrapper, and overflow-x:hidden as a defense-in-depth safety net on
+  html/body/.phone
+
+Dark mode input contrast:
+- The data input's background was hardcoded to white regardless of
+  theme, so dark mode showed light cream text on a white field --
+  unreadable. Background now uses the theme-aware --card token
+- Added a theme-aware --stamp-ring variable so the focus outline
+  matches the current theme's accent instead of always using the
+  light-mode blue
+- Added explicit placeholder color and caret-color for polish
+
+Verified: all 6 reference QR codes still match exactly, overflow/
+boundary/empty-input logic unaffected (no JS changes).
+---
+ index.html | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/index.html b/index.html
+index 931f76c..b2dd4d2 100644
+--- a/index.html
++++ b/index.html
+@@ -35,6 +35,7 @@
+     --punch-shadow:rgba(33,29,23,.35);
+     --qr-shadow:rgba(33,29,23,.4);
+     --scrim:rgba(255,255,255,.5);
++    --stamp-ring:rgba(43,76,126,.18);
+     color-scheme:light;
+   }
+ 
+@@ -55,6 +56,7 @@
+     --punch-shadow:rgba(0,0,0,.6);
+     --qr-shadow:rgba(0,0,0,.5);
+     --scrim:rgba(0,0,0,.4);
++    --stamp-ring:rgba(124,161,217,.28);
+     color-scheme:dark;
+   }
+ 
+@@ -76,6 +78,7 @@
+       --punch-shadow:rgba(0,0,0,.6);
+       --qr-shadow:rgba(0,0,0,.5);
+       --scrim:rgba(0,0,0,.4);
++      --stamp-ring:rgba(124,161,217,.28);
+       color-scheme:dark;
+     }
+   }
+@@ -85,7 +88,7 @@
+   }
+ 
+   *{ box-sizing:border-box; }
+-  html,body{ height:100%; }
++  html,body{ height:100%; overflow-x:hidden; }
+   body{
+     margin:0;
+     background:var(--backdrop);
+@@ -94,6 +97,7 @@
+     display:flex;
+     justify-content:center;
+     -webkit-font-smoothing:antialiased;
++    max-width:100vw;
+   }
+   .mono{ font-family:'IBM Plex Mono',monospace; }
+ 
+@@ -106,6 +110,7 @@
+     display:flex;
+     flex-direction:column;
+     position:relative;
++    overflow-x:hidden;
+   }
+   /* The bezel/notch/fixed-height "phone mockup" is a desktop preview affordance only.
+      Gating on (pointer:fine) keeps it off real touchscreens -- phones, phablets,
+@@ -223,13 +228,14 @@
+   .input-row{ position:relative; }
+   #data-input{
+     width:100%; font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:500;
+-    letter-spacing:.02em; color:var(--ink); background:#fff;
++    letter-spacing:.02em; color:var(--ink); background:var(--card);
+     border:1.5px solid var(--line-strong); border-radius:12px;
+-    padding:13px 40px 13px 14px;
+-    outline:none; transition:border-color .15s ease, box-shadow .15s ease;
++    padding:13px 40px 13px 14px; caret-color:var(--stamp);
++    outline:none; transition:border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+   }
++  #data-input::placeholder{ color:var(--ink-soft); opacity:.7; }
+   #data-input:focus-visible{
+-    border-color:var(--stamp); box-shadow:0 0 0 3px rgba(43,76,126,.18);
++    border-color:var(--stamp); box-shadow:0 0 0 3px var(--stamp-ring);
+   }
+   #clear-btn{
+     position:absolute; right:6px; top:50%; transform:translateY(-50%);
+@@ -310,6 +316,7 @@
+     background:#fff; border-radius:14px; padding:14px;
+     box-shadow:0 6px 16px -10px var(--qr-shadow);
+     display:inline-flex; min-height:180px; min-width:180px;
++    max-width:100%; box-sizing:border-box;
+     align-items:center; justify-content:center;
+   }
+   .qr-wrap.chrome-off{
+@@ -336,7 +343,7 @@
+   .switch[aria-pressed="true"]{ background:var(--stamp); }
+   .switch[aria-pressed="true"]::before{ transform:translateX(18px); }
+   .switch:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
+-  #qr-canvas{ display:block; border-radius:4px; }
++  #qr-canvas{ display:block; border-radius:4px; max-width:100%; height:auto; }
+   .qr-placeholder{
+     color:var(--ink-soft); font-size:12.5px; max-width:150px; line-height:1.5;
+   }
 -- 
 2.43.0
 

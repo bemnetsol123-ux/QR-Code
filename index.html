@@ -35,6 +35,7 @@
     --punch-shadow:rgba(33,29,23,.35);
     --qr-shadow:rgba(33,29,23,.4);
     --scrim:rgba(255,255,255,.5);
+    --stamp-ring:rgba(43,76,126,.18);
     color-scheme:light;
   }
 
@@ -55,6 +56,7 @@
     --punch-shadow:rgba(0,0,0,.6);
     --qr-shadow:rgba(0,0,0,.5);
     --scrim:rgba(0,0,0,.4);
+    --stamp-ring:rgba(124,161,217,.28);
     color-scheme:dark;
   }
 
@@ -76,6 +78,7 @@
       --punch-shadow:rgba(0,0,0,.6);
       --qr-shadow:rgba(0,0,0,.5);
       --scrim:rgba(0,0,0,.4);
+      --stamp-ring:rgba(124,161,217,.28);
       color-scheme:dark;
     }
   }
@@ -85,7 +88,7 @@
   }
 
   *{ box-sizing:border-box; }
-  html,body{ height:100%; }
+  html,body{ height:100%; overflow-x:hidden; }
   body{
     margin:0;
     background:var(--backdrop);
@@ -94,6 +97,7 @@
     display:flex;
     justify-content:center;
     -webkit-font-smoothing:antialiased;
+    max-width:100vw;
   }
   .mono{ font-family:'IBM Plex Mono',monospace; }
 
@@ -106,6 +110,7 @@
     display:flex;
     flex-direction:column;
     position:relative;
+    overflow-x:hidden;
   }
   /* The bezel/notch/fixed-height "phone mockup" is a desktop preview affordance only.
      Gating on (pointer:fine) keeps it off real touchscreens -- phones, phablets,
@@ -223,13 +228,14 @@
   .input-row{ position:relative; }
   #data-input{
     width:100%; font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:500;
-    letter-spacing:.02em; color:var(--ink); background:#fff;
+    letter-spacing:.02em; color:var(--ink); background:var(--card);
     border:1.5px solid var(--line-strong); border-radius:12px;
-    padding:13px 40px 13px 14px;
-    outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+    padding:13px 40px 13px 14px; caret-color:var(--stamp);
+    outline:none; transition:border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
   }
+  #data-input::placeholder{ color:var(--ink-soft); opacity:.7; }
   #data-input:focus-visible{
-    border-color:var(--stamp); box-shadow:0 0 0 3px rgba(43,76,126,.18);
+    border-color:var(--stamp); box-shadow:0 0 0 3px var(--stamp-ring);
   }
   #clear-btn{
     position:absolute; right:6px; top:50%; transform:translateY(-50%);
@@ -310,6 +316,7 @@
     background:#fff; border-radius:14px; padding:14px;
     box-shadow:0 6px 16px -10px var(--qr-shadow);
     display:inline-flex; min-height:180px; min-width:180px;
+    max-width:100%; box-sizing:border-box;
     align-items:center; justify-content:center;
   }
   .qr-wrap.chrome-off{
@@ -336,7 +343,7 @@
   .switch[aria-pressed="true"]{ background:var(--stamp); }
   .switch[aria-pressed="true"]::before{ transform:translateX(18px); }
   .switch:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
-  #qr-canvas{ display:block; border-radius:4px; }
+  #qr-canvas{ display:block; border-radius:4px; max-width:100%; height:auto; }
   .qr-placeholder{
     color:var(--ink-soft); font-size:12.5px; max-width:150px; line-height:1.5;
   }
