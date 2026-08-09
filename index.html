@@ -107,10 +107,15 @@
     flex-direction:column;
     position:relative;
   }
-  @media (min-width:640px){
+  /* The bezel/notch/fixed-height "phone mockup" is a desktop preview affordance only.
+     Gating on (pointer:fine) keeps it off real touchscreens -- phones, phablets,
+     tablets, and phones in landscape -- which get a native full-bleed layout at
+     any width instead. Width alone isn't a safe signal: a phone in landscape or
+     a large Android phone can easily exceed 640px. */
+  @media (min-width:640px) and (pointer:fine){
     body{ padding:40px 20px; align-items:center; }
     .phone{
-      height:860px;
+      height:min(860px, 94vh);
       min-height:0;
       border-radius:44px;
       overflow:hidden;
@@ -122,7 +127,38 @@
     }
   }
   .notch{ display:none; }
-  @media (min-width:640px){ .notch{ display:block; } }
+  @media (min-width:640px) and (pointer:fine){ .notch{ display:block; } }
+
+  /* Real touch devices: respect the safe area (notch / home indicator) at the
+     top too -- the bottom action bar already does via env(safe-area-inset-bottom). */
+  @media (pointer:coarse), (max-width:639px){
+    .app-bar{ padding-top:max(22px, env(safe-area-inset-top)); }
+  }
+
+  /* Small phones (e.g. iPhone SE, small Android) -- tighten spacing a touch
+     so nothing feels cramped or forces horizontal scroll. */
+  @media (max-width:359px){
+    .app-bar{ padding-left:16px; padding-right:16px; }
+    .phone-content{ padding-left:16px; padding-right:16px; }
+    .app-bar h1{ font-size:20px; }
+    #data-input{ font-size:17px; padding-right:36px; }
+    .segmented button{ font-size:11.5px; padding:8px 2px; }
+    .action-bar{ padding-left:16px; padding-right:16px; gap:8px; }
+    .btn{ font-size:12.5px; padding:12px 10px; }
+  }
+
+  /* Short viewports (landscape phones, small browser windows) -- the layout
+     already scrolls internally, but trim vertical rhythm so more fits without
+     feeling squeezed. */
+  @media (max-height:560px){
+    .app-bar{ padding-top:14px; padding-bottom:10px; }
+    .app-bar h1{ font-size:19px; }
+    .app-bar p{ display:none; }
+    .card{ padding:14px; }
+    .tag-card{ padding:14px 14px 12px; }
+    .qr-wrap{ min-height:140px; min-width:140px; padding:10px; }
+    .perf{ margin-top:14px; }
+  }
 
   /* ---------- App bar ---------- */
   .app-bar{
@@ -132,7 +168,7 @@
     position:relative;
     z-index:10;
   }
-  @media (min-width:640px){ .app-bar{ padding-top:42px; } }
+  @media (min-width:640px) and (pointer:fine){ .app-bar{ padding-top:42px; } }
   .app-bar .eyebrow{
     font-size:11px; letter-spacing:.14em; font-weight:600;
     color:var(--stamp); text-transform:uppercase;

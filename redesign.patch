@@ -1,7 +1,7 @@
 From ee94113d59ed7f74a6adffeea871d274df6f105e Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:17:53 +0000
-Subject: [PATCH 1/5] Fix QR generator: embed self-contained QR library
+Subject: [PATCH 1/6] Fix QR generator: embed self-contained QR library
 
 - Bundles the qrcode npm library's source directly into index.html
 - Removes dependency on a broken/missing jsdelivr CDN build for
@@ -224,7 +224,7 @@ index 0000000..7cffb18
 From d6bfa376ddc51ce8c12f32c4b36a0435ee83a71b Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:39:33 +0000
-Subject: [PATCH 2/5] Redesign as mobile-app-style asset tag printer
+Subject: [PATCH 2/6] Redesign as mobile-app-style asset tag printer
 
 - Custom kraft-tag visual identity (punch hole, perforated tear line,
   stamped spec line) instead of generic dashboard styling
@@ -924,7 +924,7 @@ index 7cffb18..d28c4c0 100644
 From 06a92302d3922444f7d8173abe1beb5da2b76afe Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:48:09 +0000
-Subject: [PATCH 3/5] Add dark/light mode
+Subject: [PATCH 3/6] Add dark/light mode
 
 - Auto-detects system preference (prefers-color-scheme) on first load
 - Manual toggle in the app bar, persisted via localStorage
@@ -1131,7 +1131,7 @@ index d28c4c0..9d4530e 100644
 From ec69435eba71df15cc71ed0d6435e2d85edfa66f Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:09:33 +0000
-Subject: [PATCH 4/5] Match reference QR codes exactly (byte mode +
+Subject: [PATCH 4/6] Match reference QR codes exactly (byte mode +
  qrcode-generator engine)
 
 - Decoded and pixel/module-verified 6 reference QR codes provided by
@@ -1331,7 +1331,7 @@ index 9d4530e..6bc38b1 100644
 From fbda72780c655cfad00a1e89e36bb9118c80b899 Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:20:31 +0000
-Subject: [PATCH 5/5] Add border toggle (rounded card frame)
+Subject: [PATCH 5/6] Add border toggle (rounded card frame)
 
 - New Border switch in the settings card, off by default (preserves
   exact match with the 6 reference codes when off -- re-verified,
@@ -1493,6 +1493,107 @@ index 6bc38b1..d699886 100644
  
        var count = qr.getModuleCount();
        var versionLabel = versionMode === '1' ? 'V1' : 'V' + ((count - 17) / 4);
+-- 
+2.43.0
+
+
+From 977b2891e538c79e1d3db1d25cceb6d5201579dd Mon Sep 17 00:00:00 2001
+From: QR Generator <you@example.com>
+Date: Sun, 9 Aug 2026 06:11:51 +0000
+Subject: [PATCH 6/6] Fix responsive breakpoints for real devices
+
+- The desktop 'phone mockup' chrome (bezel, notch, fixed height,
+  drop shadow) was triggering on ANY viewport >=640px wide -- which
+  wrongly caught large Android phones, phablets, tablets, and even a
+  regular phone rotated to landscape. Gated it behind (pointer:fine)
+  so it only shows on mouse/trackpad desktop browsers; any real
+  touchscreen now gets a native full-bleed layout at every width
+- Desktop mockup height now clamps to min(860px, 94vh) so it can't
+  overflow/clip on short browser windows
+- Added safe-area-inset-top handling for the app bar on real devices
+  (notch/status bar), matching the existing bottom safe-area handling
+- Added a <360px breakpoint tightening padding, font sizes, and
+  segmented control sizing for small phones (iPhone SE etc.)
+- Added a short-viewport (<=560px height) breakpoint for landscape
+  phones/small windows -- trims vertical rhythm and hides the
+  subtitle line so the whole card fits without excess scrolling
+- Verified: all 6 reference QR codes still match exactly, and
+  overflow/boundary/empty-input logic is unaffected (CSS-only change)
+---
+ index.html | 44 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
+
+diff --git a/index.html b/index.html
+index d699886..931f76c 100644
+--- a/index.html
++++ b/index.html
+@@ -107,10 +107,15 @@
+     flex-direction:column;
+     position:relative;
+   }
+-  @media (min-width:640px){
++  /* The bezel/notch/fixed-height "phone mockup" is a desktop preview affordance only.
++     Gating on (pointer:fine) keeps it off real touchscreens -- phones, phablets,
++     tablets, and phones in landscape -- which get a native full-bleed layout at
++     any width instead. Width alone isn't a safe signal: a phone in landscape or
++     a large Android phone can easily exceed 640px. */
++  @media (min-width:640px) and (pointer:fine){
+     body{ padding:40px 20px; align-items:center; }
+     .phone{
+-      height:860px;
++      height:min(860px, 94vh);
+       min-height:0;
+       border-radius:44px;
+       overflow:hidden;
+@@ -122,7 +127,38 @@
+     }
+   }
+   .notch{ display:none; }
+-  @media (min-width:640px){ .notch{ display:block; } }
++  @media (min-width:640px) and (pointer:fine){ .notch{ display:block; } }
++
++  /* Real touch devices: respect the safe area (notch / home indicator) at the
++     top too -- the bottom action bar already does via env(safe-area-inset-bottom). */
++  @media (pointer:coarse), (max-width:639px){
++    .app-bar{ padding-top:max(22px, env(safe-area-inset-top)); }
++  }
++
++  /* Small phones (e.g. iPhone SE, small Android) -- tighten spacing a touch
++     so nothing feels cramped or forces horizontal scroll. */
++  @media (max-width:359px){
++    .app-bar{ padding-left:16px; padding-right:16px; }
++    .phone-content{ padding-left:16px; padding-right:16px; }
++    .app-bar h1{ font-size:20px; }
++    #data-input{ font-size:17px; padding-right:36px; }
++    .segmented button{ font-size:11.5px; padding:8px 2px; }
++    .action-bar{ padding-left:16px; padding-right:16px; gap:8px; }
++    .btn{ font-size:12.5px; padding:12px 10px; }
++  }
++
++  /* Short viewports (landscape phones, small browser windows) -- the layout
++     already scrolls internally, but trim vertical rhythm so more fits without
++     feeling squeezed. */
++  @media (max-height:560px){
++    .app-bar{ padding-top:14px; padding-bottom:10px; }
++    .app-bar h1{ font-size:19px; }
++    .app-bar p{ display:none; }
++    .card{ padding:14px; }
++    .tag-card{ padding:14px 14px 12px; }
++    .qr-wrap{ min-height:140px; min-width:140px; padding:10px; }
++    .perf{ margin-top:14px; }
++  }
+ 
+   /* ---------- App bar ---------- */
+   .app-bar{
+@@ -132,7 +168,7 @@
+     position:relative;
+     z-index:10;
+   }
+-  @media (min-width:640px){ .app-bar{ padding-top:42px; } }
++  @media (min-width:640px) and (pointer:fine){ .app-bar{ padding-top:42px; } }
+   .app-bar .eyebrow{
+     font-size:11px; letter-spacing:.14em; font-weight:600;
+     color:var(--stamp); text-transform:uppercase;
 -- 
 2.43.0
 
