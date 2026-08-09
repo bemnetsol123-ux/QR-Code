@@ -489,7 +489,7 @@
   <div class="action-bar">
     <button id="download-btn" class="btn btn-primary" type="button" disabled>
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v9m0 0L4 6.5M7.5 10l3.5-3.5M2 12.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Download PNG
+      <span id="download-btn-label">Download PNG</span>
     </button>
     <button id="copy-btn" class="btn btn-secondary" type="button">Copy</button>
   </div>
@@ -711,13 +711,59 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
     voidBanner.hidden = true;
   }
 
-  // ---------- Download ----------
+  // ---------- Download / Save ----------
+  var downloadBtnLabel = document.getElementById('download-btn-label');
+
+  // Feature-detect once at load so the button label sets expectations correctly.
+  // The Web Share API (with files) is what actually lets mobile users save
+  // straight into their Photos/Gallery app via the native share sheet --
+  // a plain <a download> link only ever reaches the browser's Downloads folder.
+  var shareCapable = !!(navigator.share && navigator.canShare);
+  if (shareCapable) {
+    downloadBtnLabel.textContent = 'Save Image';
+  }
+
+  function classicDownload(blobOrDataUrl, filename) {
+    var link = document.createElement('a');
+    link.download = filename;
+    if (typeof blobOrDataUrl === 'string') {
+      link.href = blobOrDataUrl;
+      link.click();
+    } else {
+      var url = URL.createObjectURL(blobOrDataUrl);
+      link.href = url;
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+  }
+
   downloadBtn.addEventListener('click', function () {
     var raw = input.value.trim().toUpperCase() || 'code';
-    var link = document.createElement('a');
-    link.download = 'QR_V1_' + raw + '.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    var filename = 'QR_V1_' + raw + '.png';
+
+    if (!canvas.toBlob) {
+      classicDownload(canvas.toDataURL('image/png'), filename);
+      return;
+    }
+
+    canvas.toBlob(function (blob) {
+      if (!blob) { classicDownload(canvas.toDataURL('image/png'), filename); return; }
+
+      if (shareCapable) {
+        var file = new File([blob], filename, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: filename }).catch(function (err) {
+            // AbortError just means the person closed the share sheet -- not a failure.
+            if (err && err.name !== 'AbortError') {
+              classicDownload(blob, filename);
+            }
+          });
+          return;
+        }
+      }
+
+      classicDownload(blob, filename);
+    }, 'image/png');
   });
 
   // ---------- Copy ----------

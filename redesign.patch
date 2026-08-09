@@ -1,7 +1,7 @@
 From ee94113d59ed7f74a6adffeea871d274df6f105e Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:17:53 +0000
-Subject: [PATCH 1/7] Fix QR generator: embed self-contained QR library
+Subject: [PATCH 1/8] Fix QR generator: embed self-contained QR library
 
 - Bundles the qrcode npm library's source directly into index.html
 - Removes dependency on a broken/missing jsdelivr CDN build for
@@ -224,7 +224,7 @@ index 0000000..7cffb18
 From d6bfa376ddc51ce8c12f32c4b36a0435ee83a71b Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:39:33 +0000
-Subject: [PATCH 2/7] Redesign as mobile-app-style asset tag printer
+Subject: [PATCH 2/8] Redesign as mobile-app-style asset tag printer
 
 - Custom kraft-tag visual identity (punch hole, perforated tear line,
   stamped spec line) instead of generic dashboard styling
@@ -924,7 +924,7 @@ index 7cffb18..d28c4c0 100644
 From 06a92302d3922444f7d8173abe1beb5da2b76afe Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:48:09 +0000
-Subject: [PATCH 3/7] Add dark/light mode
+Subject: [PATCH 3/8] Add dark/light mode
 
 - Auto-detects system preference (prefers-color-scheme) on first load
 - Manual toggle in the app bar, persisted via localStorage
@@ -1131,7 +1131,7 @@ index d28c4c0..9d4530e 100644
 From ec69435eba71df15cc71ed0d6435e2d85edfa66f Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:09:33 +0000
-Subject: [PATCH 4/7] Match reference QR codes exactly (byte mode +
+Subject: [PATCH 4/8] Match reference QR codes exactly (byte mode +
  qrcode-generator engine)
 
 - Decoded and pixel/module-verified 6 reference QR codes provided by
@@ -1331,7 +1331,7 @@ index 9d4530e..6bc38b1 100644
 From fbda72780c655cfad00a1e89e36bb9118c80b899 Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:20:31 +0000
-Subject: [PATCH 5/7] Add border toggle (rounded card frame)
+Subject: [PATCH 5/8] Add border toggle (rounded card frame)
 
 - New Border switch in the settings card, off by default (preserves
   exact match with the 6 reference codes when off -- re-verified,
@@ -1500,7 +1500,7 @@ index 6bc38b1..d699886 100644
 From 977b2891e538c79e1d3db1d25cceb6d5201579dd Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sun, 9 Aug 2026 06:11:51 +0000
-Subject: [PATCH 6/7] Fix responsive breakpoints for real devices
+Subject: [PATCH 6/8] Fix responsive breakpoints for real devices
 
 - The desktop 'phone mockup' chrome (bezel, notch, fixed height,
   drop shadow) was triggering on ANY viewport >=640px wide -- which
@@ -1601,7 +1601,7 @@ index d699886..931f76c 100644
 From 1da7d7940293e85c2b557dbaeecc072b3b2e6f68 Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sun, 9 Aug 2026 06:18:11 +0000
-Subject: [PATCH 7/7] Fix horizontal scroll and dark-mode input contrast
+Subject: [PATCH 7/8] Fix horizontal scroll and dark-mode input contrast
 
 Horizontal scroll:
 - The QR canvas had no max-width, so longer payloads using Version
@@ -1716,6 +1716,114 @@ index 931f76c..b2dd4d2 100644
    .qr-placeholder{
      color:var(--ink-soft); font-size:12.5px; max-width:150px; line-height:1.5;
    }
+-- 
+2.43.0
+
+
+From 3fe28b36e244f3ca990b9fa424a2cfb0165c058c Mon Sep 17 00:00:00 2001
+From: QR Generator <you@example.com>
+Date: Sun, 9 Aug 2026 06:25:53 +0000
+Subject: [PATCH 8/8] Save to Gallery on mobile instead of browser Downloads
+
+- A plain <a download> link only ever reaches the browser's Downloads
+  folder on mobile -- it can't put a file into Photos/Gallery directly
+  (no web API grants that). The reliable way to reach it is the Web
+  Share API: it opens the native share sheet, and 'Save Image' /
+  'Save to Photos' there writes straight into the gallery
+- Feature-detects navigator.share + navigator.canShare once at load;
+  if supported, converts the canvas to a Blob/File and calls
+  navigator.share({files:[file]}); button label switches to 'Save
+  Image' so the action matches what will actually happen
+- Falls back to the classic <a download> link when: Share API isn't
+  available (desktop), canShare() rejects the file, or share() fails
+  for a real error -- but NOT when the user simply cancels the share
+  sheet (AbortError), so cancelling doesn't force a second download
+- Verified all 3 branches directly: desktop fallback (correct
+  filename), successful share call (correct file/name passed, no
+  fallback triggered), and share-cancelled (no forced fallback)
+- Re-ran full regression: all 6 reference codes still match exactly
+---
+ index.html | 58 ++++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 52 insertions(+), 6 deletions(-)
+
+diff --git a/index.html b/index.html
+index b2dd4d2..568ead6 100644
+--- a/index.html
++++ b/index.html
+@@ -489,7 +489,7 @@
+   <div class="action-bar">
+     <button id="download-btn" class="btn btn-primary" type="button" disabled>
+       <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v9m0 0L4 6.5M7.5 10l3.5-3.5M2 12.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+-      Download PNG
++      <span id="download-btn-label">Download PNG</span>
+     </button>
+     <button id="copy-btn" class="btn btn-secondary" type="button">Copy</button>
+   </div>
+@@ -711,13 +711,59 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
+     voidBanner.hidden = true;
+   }
+ 
+-  // ---------- Download ----------
++  // ---------- Download / Save ----------
++  var downloadBtnLabel = document.getElementById('download-btn-label');
++
++  // Feature-detect once at load so the button label sets expectations correctly.
++  // The Web Share API (with files) is what actually lets mobile users save
++  // straight into their Photos/Gallery app via the native share sheet --
++  // a plain <a download> link only ever reaches the browser's Downloads folder.
++  var shareCapable = !!(navigator.share && navigator.canShare);
++  if (shareCapable) {
++    downloadBtnLabel.textContent = 'Save Image';
++  }
++
++  function classicDownload(blobOrDataUrl, filename) {
++    var link = document.createElement('a');
++    link.download = filename;
++    if (typeof blobOrDataUrl === 'string') {
++      link.href = blobOrDataUrl;
++      link.click();
++    } else {
++      var url = URL.createObjectURL(blobOrDataUrl);
++      link.href = url;
++      link.click();
++      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
++    }
++  }
++
+   downloadBtn.addEventListener('click', function () {
+     var raw = input.value.trim().toUpperCase() || 'code';
+-    var link = document.createElement('a');
+-    link.download = 'QR_V1_' + raw + '.png';
+-    link.href = canvas.toDataURL('image/png');
+-    link.click();
++    var filename = 'QR_V1_' + raw + '.png';
++
++    if (!canvas.toBlob) {
++      classicDownload(canvas.toDataURL('image/png'), filename);
++      return;
++    }
++
++    canvas.toBlob(function (blob) {
++      if (!blob) { classicDownload(canvas.toDataURL('image/png'), filename); return; }
++
++      if (shareCapable) {
++        var file = new File([blob], filename, { type: 'image/png' });
++        if (navigator.canShare({ files: [file] })) {
++          navigator.share({ files: [file], title: filename }).catch(function (err) {
++            // AbortError just means the person closed the share sheet -- not a failure.
++            if (err && err.name !== 'AbortError') {
++              classicDownload(blob, filename);
++            }
++          });
++          return;
++        }
++      }
++
++      classicDownload(blob, filename);
++    }, 'image/png');
+   });
+ 
+   // ---------- Copy ----------
 -- 
 2.43.0
 
