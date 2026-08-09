@@ -276,6 +276,30 @@
     display:inline-flex; min-height:180px; min-width:180px;
     align-items:center; justify-content:center;
   }
+  .qr-wrap.chrome-off{
+    background:transparent; box-shadow:none; padding:0;
+  }
+
+  /* ---------- Toggle switch ---------- */
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);
+  }
+  .toggle-row .toggle-label{ font-size:13px; font-weight:600; color:var(--ink); }
+  .toggle-row .toggle-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
+  .switch{
+    flex:none; width:44px; height:26px; border-radius:99px; border:none;
+    background:var(--line-strong); position:relative; cursor:pointer; padding:0;
+    transition:background-color .15s ease;
+  }
+  .switch::before{
+    content:""; position:absolute; top:3px; left:3px; width:20px; height:20px;
+    border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);
+    transition:transform .15s ease;
+  }
+  .switch[aria-pressed="true"]{ background:var(--stamp); }
+  .switch[aria-pressed="true"]::before{ transform:translateX(18px); }
+  .switch:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
   #qr-canvas{ display:block; border-radius:4px; }
   .qr-placeholder{
     color:var(--ink-soft); font-size:12.5px; max-width:150px; line-height:1.5;
@@ -391,13 +415,21 @@
           </div>
         </div>
       </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Border</div>
+          <div class="toggle-sub">Rounded card with a frame line</div>
+        </div>
+        <button id="border-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-pressed="false" aria-label="Toggle border frame"></button>
+      </div>
     </section>
 
     <div class="perf" aria-hidden="true"><div class="perf-line"></div></div>
 
     <section class="tag-card">
       <div class="punch"></div>
-      <div class="qr-wrap">
+      <div id="qr-wrap" class="qr-wrap">
         <canvas id="qr-canvas" width="180" height="180"></canvas>
         <div id="qr-placeholder" class="qr-placeholder" hidden>Type a code above to print a tag</div>
       </div>
@@ -462,10 +494,21 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
   var voidText = document.getElementById('void-text');
   var downloadBtn = document.getElementById('download-btn');
   var copyBtn = document.getElementById('copy-btn');
+  var borderToggle = document.getElementById('border-toggle');
+  var qrWrap = document.getElementById('qr-wrap');
 
   // ---------- State ----------
   var ecLevel = 'L';
   var versionMode = '1';
+  var borderEnabled = false;
+
+  borderToggle.addEventListener('click', function () {
+    borderEnabled = !borderEnabled;
+    borderToggle.setAttribute('aria-pressed', String(borderEnabled));
+    borderToggle.setAttribute('aria-checked', String(borderEnabled));
+    qrWrap.classList.toggle('chrome-off', borderEnabled);
+    renderQR();
+  });
 
   // Reference codes were generated with Byte-mode encoding, EC-L, at V1 —
   // confirmed by matching 6 known QR codes module-for-module. We lock to
@@ -503,14 +546,38 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
   });
 
   // ---------- Manual canvas draw (full control over margin + colors) ----------
+  function roundedRectPath(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
   function drawQR(qr, canvasEl, opts) {
     var count = qr.getModuleCount();
     var size = (count + opts.margin * 2) * opts.scale;
     canvasEl.width = size;
     canvasEl.height = size;
     var ctx = canvasEl.getContext('2d');
-    ctx.fillStyle = opts.light;
-    ctx.fillRect(0, 0, size, size);
+    ctx.clearRect(0, 0, size, size);
+
+    if (opts.border) {
+      var radius = opts.scale * 2.4;
+      roundedRectPath(ctx, 0, 0, size, size, radius);
+      ctx.fillStyle = opts.light;
+      ctx.fill();
+      ctx.save();
+      roundedRectPath(ctx, 0, 0, size, size, radius);
+      ctx.clip();
+    } else {
+      ctx.fillStyle = opts.light;
+      ctx.fillRect(0, 0, size, size);
+    }
+
     ctx.fillStyle = opts.dark;
     for (var r = 0; r < count; r++) {
       for (var c = 0; c < count; c++) {
@@ -518,6 +585,15 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
           ctx.fillRect((c + opts.margin) * opts.scale, (r + opts.margin) * opts.scale, opts.scale, opts.scale);
         }
       }
+    }
+
+    if (opts.border) {
+      ctx.restore();
+      var inset = opts.scale * 0.6;
+      roundedRectPath(ctx, inset, inset, size - inset * 2, size - inset * 2, radius - inset);
+      ctx.strokeStyle = opts.borderColor || '#D9D4C4';
+      ctx.lineWidth = Math.max(1.5, opts.scale * 0.32);
+      ctx.stroke();
     }
   }
 
@@ -562,7 +638,7 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
       downloadBtn.disabled = false;
       tagData.textContent = raw;
 
-      drawQR(qr, canvas, { margin: 3, scale: 8, dark: '#211D17', light: '#FFFFFF' });
+      drawQR(qr, canvas, { margin: 3, scale: 8, dark: '#211D17', light: '#FFFFFF', border: borderEnabled });
 
       var count = qr.getModuleCount();
       var versionLabel = versionMode === '1' ? 'V1' : 'V' + ((count - 17) / 4);

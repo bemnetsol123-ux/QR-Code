@@ -1,7 +1,7 @@
 From ee94113d59ed7f74a6adffeea871d274df6f105e Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:17:53 +0000
-Subject: [PATCH 1/4] Fix QR generator: embed self-contained QR library
+Subject: [PATCH 1/5] Fix QR generator: embed self-contained QR library
 
 - Bundles the qrcode npm library's source directly into index.html
 - Removes dependency on a broken/missing jsdelivr CDN build for
@@ -224,7 +224,7 @@ index 0000000..7cffb18
 From d6bfa376ddc51ce8c12f32c4b36a0435ee83a71b Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:39:33 +0000
-Subject: [PATCH 2/4] Redesign as mobile-app-style asset tag printer
+Subject: [PATCH 2/5] Redesign as mobile-app-style asset tag printer
 
 - Custom kraft-tag visual identity (punch hole, perforated tear line,
   stamped spec line) instead of generic dashboard styling
@@ -924,7 +924,7 @@ index 7cffb18..d28c4c0 100644
 From 06a92302d3922444f7d8173abe1beb5da2b76afe Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 07:48:09 +0000
-Subject: [PATCH 3/4] Add dark/light mode
+Subject: [PATCH 3/5] Add dark/light mode
 
 - Auto-detects system preference (prefers-color-scheme) on first load
 - Manual toggle in the app bar, persisted via localStorage
@@ -1131,7 +1131,7 @@ index d28c4c0..9d4530e 100644
 From ec69435eba71df15cc71ed0d6435e2d85edfa66f Mon Sep 17 00:00:00 2001
 From: QR Generator <you@example.com>
 Date: Sat, 8 Aug 2026 20:09:33 +0000
-Subject: [PATCH 4/4] Match reference QR codes exactly (byte mode +
+Subject: [PATCH 4/5] Match reference QR codes exactly (byte mode +
  qrcode-generator engine)
 
 - Decoded and pixel/module-verified 6 reference QR codes provided by
@@ -1324,6 +1324,175 @@ index 9d4530e..6bc38b1 100644
    }
  
    function showVoid(msg) {
+-- 
+2.43.0
+
+
+From fbda72780c655cfad00a1e89e36bb9118c80b899 Mon Sep 17 00:00:00 2001
+From: QR Generator <you@example.com>
+Date: Sat, 8 Aug 2026 20:20:31 +0000
+Subject: [PATCH 5/5] Add border toggle (rounded card frame)
+
+- New Border switch in the settings card, off by default (preserves
+  exact match with the 6 reference codes when off -- re-verified,
+  zero pixel diff)
+- When on, the border is baked directly into the canvas/PNG, not just
+  a CSS overlay: rounded corners with true alpha transparency outside
+  the frame, plus a thin stroke line, matching the uploaded reference
+  style so the downloaded file looks the same as what's previewed
+- Verified: corner pixels are alpha=0 (real transparency, not white),
+  QR data area untouched, and toggling off returns to the plain
+  square output byte-for-byte
+---
+ index.html | 84 +++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 80 insertions(+), 4 deletions(-)
+
+diff --git a/index.html b/index.html
+index 6bc38b1..d699886 100644
+--- a/index.html
++++ b/index.html
+@@ -276,6 +276,30 @@
+     display:inline-flex; min-height:180px; min-width:180px;
+     align-items:center; justify-content:center;
+   }
++  .qr-wrap.chrome-off{
++    background:transparent; box-shadow:none; padding:0;
++  }
++
++  /* ---------- Toggle switch ---------- */
++  .toggle-row{
++    display:flex; align-items:center; justify-content:space-between;
++    margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);
++  }
++  .toggle-row .toggle-label{ font-size:13px; font-weight:600; color:var(--ink); }
++  .toggle-row .toggle-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
++  .switch{
++    flex:none; width:44px; height:26px; border-radius:99px; border:none;
++    background:var(--line-strong); position:relative; cursor:pointer; padding:0;
++    transition:background-color .15s ease;
++  }
++  .switch::before{
++    content:""; position:absolute; top:3px; left:3px; width:20px; height:20px;
++    border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);
++    transition:transform .15s ease;
++  }
++  .switch[aria-pressed="true"]{ background:var(--stamp); }
++  .switch[aria-pressed="true"]::before{ transform:translateX(18px); }
++  .switch:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
+   #qr-canvas{ display:block; border-radius:4px; }
+   .qr-placeholder{
+     color:var(--ink-soft); font-size:12.5px; max-width:150px; line-height:1.5;
+@@ -391,13 +415,21 @@
+           </div>
+         </div>
+       </div>
++
++      <div class="toggle-row">
++        <div>
++          <div class="toggle-label">Border</div>
++          <div class="toggle-sub">Rounded card with a frame line</div>
++        </div>
++        <button id="border-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-pressed="false" aria-label="Toggle border frame"></button>
++      </div>
+     </section>
+ 
+     <div class="perf" aria-hidden="true"><div class="perf-line"></div></div>
+ 
+     <section class="tag-card">
+       <div class="punch"></div>
+-      <div class="qr-wrap">
++      <div id="qr-wrap" class="qr-wrap">
+         <canvas id="qr-canvas" width="180" height="180"></canvas>
+         <div id="qr-placeholder" class="qr-placeholder" hidden>Type a code above to print a tag</div>
+       </div>
+@@ -462,10 +494,21 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
+   var voidText = document.getElementById('void-text');
+   var downloadBtn = document.getElementById('download-btn');
+   var copyBtn = document.getElementById('copy-btn');
++  var borderToggle = document.getElementById('border-toggle');
++  var qrWrap = document.getElementById('qr-wrap');
+ 
+   // ---------- State ----------
+   var ecLevel = 'L';
+   var versionMode = '1';
++  var borderEnabled = false;
++
++  borderToggle.addEventListener('click', function () {
++    borderEnabled = !borderEnabled;
++    borderToggle.setAttribute('aria-pressed', String(borderEnabled));
++    borderToggle.setAttribute('aria-checked', String(borderEnabled));
++    qrWrap.classList.toggle('chrome-off', borderEnabled);
++    renderQR();
++  });
+ 
+   // Reference codes were generated with Byte-mode encoding, EC-L, at V1 —
+   // confirmed by matching 6 known QR codes module-for-module. We lock to
+@@ -503,14 +546,38 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
+   });
+ 
+   // ---------- Manual canvas draw (full control over margin + colors) ----------
++  function roundedRectPath(ctx, x, y, w, h, r) {
++    r = Math.min(r, w / 2, h / 2);
++    ctx.beginPath();
++    ctx.moveTo(x + r, y);
++    ctx.arcTo(x + w, y, x + w, y + h, r);
++    ctx.arcTo(x + w, y + h, x, y + h, r);
++    ctx.arcTo(x, y + h, x, y, r);
++    ctx.arcTo(x, y, x + w, y, r);
++    ctx.closePath();
++  }
++
+   function drawQR(qr, canvasEl, opts) {
+     var count = qr.getModuleCount();
+     var size = (count + opts.margin * 2) * opts.scale;
+     canvasEl.width = size;
+     canvasEl.height = size;
+     var ctx = canvasEl.getContext('2d');
+-    ctx.fillStyle = opts.light;
+-    ctx.fillRect(0, 0, size, size);
++    ctx.clearRect(0, 0, size, size);
++
++    if (opts.border) {
++      var radius = opts.scale * 2.4;
++      roundedRectPath(ctx, 0, 0, size, size, radius);
++      ctx.fillStyle = opts.light;
++      ctx.fill();
++      ctx.save();
++      roundedRectPath(ctx, 0, 0, size, size, radius);
++      ctx.clip();
++    } else {
++      ctx.fillStyle = opts.light;
++      ctx.fillRect(0, 0, size, size);
++    }
++
+     ctx.fillStyle = opts.dark;
+     for (var r = 0; r < count; r++) {
+       for (var c = 0; c < count; c++) {
+@@ -519,6 +586,15 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
+         }
+       }
+     }
++
++    if (opts.border) {
++      ctx.restore();
++      var inset = opts.scale * 0.6;
++      roundedRectPath(ctx, inset, inset, size - inset * 2, size - inset * 2, radius - inset);
++      ctx.strokeStyle = opts.borderColor || '#D9D4C4';
++      ctx.lineWidth = Math.max(1.5, opts.scale * 0.32);
++      ctx.stroke();
++    }
+   }
+ 
+   // ---------- Core render ----------
+@@ -562,7 +638,7 @@ var qrcode=(function(){var P=function(x,w){var g=236,l=17,n=x,s=O[w],t=null,r=0,
+       downloadBtn.disabled = false;
+       tagData.textContent = raw;
+ 
+-      drawQR(qr, canvas, { margin: 3, scale: 8, dark: '#211D17', light: '#FFFFFF' });
++      drawQR(qr, canvas, { margin: 3, scale: 8, dark: '#211D17', light: '#FFFFFF', border: borderEnabled });
+ 
+       var count = qr.getModuleCount();
+       var versionLabel = versionMode === '1' ? 'V1' : 'V' + ((count - 17) / 4);
 -- 
 2.43.0
 
